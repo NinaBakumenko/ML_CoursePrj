@@ -1,0 +1,114 @@
+---
+title: "Maching learning Course Project"
+author: "Nina Bakumenko"
+date: '2022-06-22'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Dataset describes  results of performing set of repetition of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). It contains values of 159 variables describing arm, belt, forearm, dumbbell sensors orientation and others. 160th Variable "Classe" is  manner in which they did the exercise. 
+The goal of the project is to predict the manner in which they did the exercise.
+
+```{r }
+test <- read.csv(file = 'C:/COURSERA/Machine learning/CourseProject/pml-testing.csv')
+train <- read.csv(file = 'C:/COURSERA/Machine learning/CourseProject/pml-training.csv')
+```
+The task will be solved using caret package
+```{r }
+library(caret)
+set.seed(123) 
+```
+
+## Data Cleansing
+
+Structure of the data is following:
+```{r }
+str(train)
+```
+According to the meaning of the problem, the "Classe" variable must be converted into a factor variable.
+```{r }
+train$classe<-as.factor(train$classe)
+```
+There are many variables of char type with missing values. They were removed from the dataset.
+
+```{r }
+chr_col<-train[, sapply(train, class) == 'character']
+names_In_chr_col<- names(train) %in% names(chr_col)
+train1 <- train[!names_In_chr_col]
+```
+
+After that number of the Na values was calculated for each variable.
+
+```{r }
+Na_count <-sapply(train1, function(y) sum(length(which(is.na(y)))))
+Na_count <- data.frame(Na_count)
+Na_count
+```
+Variables with Na values were removed from the dataset.
+```{r }
+d<-train1[ , colSums(is.na(train1)) == 0]
+```
+Variables which describes indexes, window, timestamp were removed too.
+
+```{r }
+d<-d[,-c(1:4)]
+```
+
+## Data slicing
+
+Original dataset was splitted into Train and test set according to "CLasse" variable values in proportion 75% x 25%
+
+```{r }
+InTrain<-createDataPartition(y=d$classe,p=0.75,list=FALSE)
+training<-d[InTrain,]
+testing<-d[-InTrain,]
+```
+
+## Basic Preprocessing
+
+Predictors were  standardized using scaling and centered. 
+```{r }
+preprocPar<-preProcess(training, method=c("scale","center"))
+train_transformd<-predict(preprocPar,training)
+test_transformd<-predict(preprocPar,testing)
+```
+
+## Fitting model
+
+For solving the movements fashions classification task Random Forest Method was chosen. Cross Validation performed with trainControl method set to “repeatedcv” with 5 folders and 3 repeats.
+ 
+```{r }
+fitControl<-trainControl(method='repeatedcv',number=5,repeats=3)
+fit<-train(classe~.,data=train_transformd,method='rf',trControl=fitControl)
+
+```
+Fitting results are following:
+
+```{r }
+fit
+```
+
+Results of testing on test dataset are following: 
+
+```{r }
+pred<-predict(fit,test_transformd)
+confusionMatrix(pred,test_transformd$classe)
+```
+Accuracy is quit high.
+
+## Prediction results for 20 test cases
+
+For the test cases the same transformations were performed.
+```{r }
+test1 <- test[!names_In_chr_col]
+t<-test1[ , colSums(is.na(test1)) == 0]
+t<-t[,-c(1:4)]
+t_transformd<-predict(preprocPar,t)
+final_pred<-predict(fit,t_transformd)
+final_pred
+```
